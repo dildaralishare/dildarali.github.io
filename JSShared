@@ -1,1 +1,110 @@
 
+var TCO_DistinctLocationArea = (function () {
+    "use strict";
+
+    var TABLE = "tcopcn_location";
+    var PRIMARY_KEY = "tcopcn_locationid";
+    var AREA_FIELD = "tcopcn_name";
+    var LOOKUP_FIELD = "tcopcn_locationareanew";
+
+    var VIEW_ID = "7f9a1c2e-3b4d-4a5f-8c6d-9e0f1a2b3c4d";
+
+    function onLoad(executionContext) {
+        var formContext = executionContext.getFormContext();
+        var lookupControl = formContext.getControl(LOOKUP_FIELD);
+
+        if (!lookupControl) {
+            console.error("Location Area lookup control not found.");
+            return;
+        }
+
+        Xrm.WebApi.retrieveMultipleRecords(
+            TABLE,
+            "?$select=" + PRIMARY_KEY + "," + AREA_FIELD
+        ).then(function (result) {
+
+            var uniqueAreas = {};
+            var records = [];
+
+            result.entities.forEach(function (record) {
+                var areaName = record[AREA_FIELD];
+
+                if (!areaName) {
+                    return;
+                }
+
+                var key = areaName.trim().toLowerCase();
+
+                // Keep only the first record for each Area.
+                if (!uniqueAreas[key]) {
+                    uniqueAreas[key] = true;
+                    records.push(record);
+                }
+            });
+
+            var conditions = records.map(function (record) {
+                return "<value>" +
+                    record[PRIMARY_KEY] +
+                    "</value>";
+            }).join("");
+
+            var fetchXml =
+                "<fetch>" +
+                    "<entity name='" + TABLE + "'>" +
+                        "<attribute name='" + PRIMARY_KEY + "' />" +
+                        "<attribute name='" + AREA_FIELD + "' />" +
+                        "<filter type='and'>" +
+                            "<condition attribute='" +
+                                PRIMARY_KEY +
+                                "' operator='in'>" +
+                                conditions +
+                            "</condition>" +
+                        "</filter>" +
+                        "<order attribute='" +
+                            AREA_FIELD +
+                            "' />" +
+                    "</entity>" +
+                "</fetch>";
+
+            var layoutXml =
+                "<grid name='resultset' " +
+                "object='1' " +
+                "jump='tcopcn_name' " +
+                "select='1' " +
+                "icon='1' " +
+                "preview='1'>" +
+                    "<row name='result' " +
+                    "id='tcopcn_locationid'>" +
+                        "<cell name='tcopcn_name' " +
+                        "width='300' />" +
+                    "</row>" +
+                "</grid>";
+
+            lookupControl.addCustomView(
+                VIEW_ID,
+                TABLE,
+                "Distinct Location Areas",
+                fetchXml,
+                layoutXml,
+                true
+            );
+
+            lookupControl.setDefaultView(VIEW_ID);
+
+            console.log(
+                "Distinct Location Areas loaded:",
+                records.length
+            );
+
+        }).catch(function (error) {
+            console.error(
+                "Error loading distinct Location Areas:",
+                error.message
+            );
+        });
+    }
+
+    return {
+        onLoad: onLoad
+    };
+})();
